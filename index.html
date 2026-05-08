@@ -80,12 +80,12 @@ header h1 {
   font-size: clamp(22px, 2.8vw, 40px);
   font-weight: 900;
   color: #fff;
-  -webkit-text-stroke: 2px #000;
-  text-stroke: 2px #000;
   text-align: center;
   width: 92%;
   pointer-events: none;
-  text-shadow: 0 4px 18px rgba(0,0,0,0.55);
+  text-shadow:
+    -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+    0 -2px 0 #000, 0 2px 0 #000, -2px 0 0 #000, 2px 0 0 #000;
   letter-spacing: -0.5px;
   line-height: 1.2;
   word-break: keep-all;
@@ -103,12 +103,13 @@ header h1 {
   font-size: 56px;
   font-weight: 900;
   color: #fff;
-  -webkit-text-stroke: 3px #000;
   z-index: 50;
   pointer-events: none;
   transition: opacity 0.3s, transform 0.3s;
   letter-spacing: 2px;
-  text-shadow: 0 4px 18px rgba(0,0,0,0.6);
+  text-shadow:
+    -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000,
+    0 -3px 0 #000, 0 3px 0 #000, -3px 0 0 #000, 3px 0 0 #000;
 }
 .match.selecting .vs { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
 
@@ -331,7 +332,10 @@ const shuffle = (arr) => {
 const imgBase = (n, title) => `images/${n}. ${title}`;
 
 function imgHTML(c) {
-  return `<img src="${escapeHtml(c.imgBase + '.jpg')}" alt="" data-png="${escapeHtml(c.imgBase + '.png')}" onerror="if(this.dataset.tried){this.style.visibility='hidden'}else{this.dataset.tried='1';this.src=this.dataset.png}">`;
+  const exts = ['jpg', 'jpeg', 'png', 'webp'];
+  const first = c.imgBase + '.' + exts[0];
+  const rest = exts.slice(1).map(e => c.imgBase + '.' + e).join('|');
+  return `<img src="${escapeHtml(first)}" alt="" data-paths="${escapeHtml(rest)}" onerror="var p=this.dataset.paths;if(p){var a=p.split('|');this.src=a[0];this.dataset.paths=a.slice(1).join('|')}else{this.style.visibility='hidden'}">`;
 }
 
 function startGame() {
