@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이상형 월드컵</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; }
+body {
+  background: #0f0f10;
+  color: #eee;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: rgba(15,15,16,0.85);
+  border-bottom: 1px solid #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.round-label {
+  font-size: 14px;
+  color: #ffd54a;
+  font-weight: 700;
+  padding: 4px 12px;
+  border: 1px solid #ffd54a;
+  border-radius: 999px;
+}
+#app { width: 100%; height: 100%; }
+
+.match {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  padding-top: 56px;
+  position: relative;
+}
+.match.selecting { pointer-events: none; }
+.choice {
+  position: relative;
+  flex: 1 1 0;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  cursor: pointer;
+  transition: flex-grow 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.55s ease;
+  background: #000;
+}
+.choice img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.4s ease, filter 0.4s ease;
+}
+.choice:hover img { transform: scale(1.04); }
+.choice::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.45));
+  pointer-events: none;
+}
+.choice .title {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(22px, 2.8vw, 40px);
+  font-weight: 900;
+  color: #fff;
+  -webkit-text-stroke: 2px #000;
+  text-stroke: 2px #000;
+  text-align: center;
+  width: 92%;
+  pointer-events: none;
+  text-shadow: 0 4px 18px rgba(0,0,0,0.55);
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  z-index: 2;
+}
+.match.selecting .choice.selected { flex-grow: 20; }
+.match.selecting .choice.unselected { flex-grow: 0; opacity: 0; }
+.match.selecting .choice.selected img { transform: scale(1.08); }
+
+.vs {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 56px;
+  font-weight: 900;
+  color: #fff;
+  -webkit-text-stroke: 3px #000;
+  z-index: 50;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  letter-spacing: 2px;
+  text-shadow: 0 4px 18px rgba(0,0,0,0.6);
+}
+.match.selecting .vs { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+
+.results {
+  padding: 80px 20px 60px;
+  max-width: 720px;
+  margin: 0 auto;
+  height: 100vh;
+  overflow-y: auto;
+}
+.results h2 {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: -0.5px;
+}
+.results .winner-name {
+  text-align: center;
+  color: #ffd54a;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+.rank-row {
+  display: flex;
+  align-items: center;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  transition: background 0.15s;
+}
+.rank-row:hover { background: #1f1f22; }
+.rank-row.top { border-color: #ffd54a; background: #2a2410; }
+.rank-row.runner-up { border-color: #888; }
+.rank-row .rank {
+  font-size: 16px;
+  font-weight: 800;
+  width: 88px;
+  text-align: center;
+  color: #ffd54a;
+  flex-shrink: 0;
+}
+.rank-row.runner-up .rank { color: #ccc; }
+.rank-row:not(.top):not(.runner-up) .rank { color: #999; }
+.rank-row img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin: 0 14px;
+  flex-shrink: 0;
+  background: #000;
+}
+.rank-row .name {
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+}
+.restart {
+  display: block;
+  margin: 28px auto 0;
+  padding: 12px 36px;
+  background: #ffd54a;
+  color: #0f0f10;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.restart:hover { background: #ffe07a; }
+
+.picker {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  max-width: 480px;
+  width: 90%;
+  padding: 30px;
+}
+.picker h2 {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 24px;
+  color: #ffd54a;
+  letter-spacing: -0.5px;
+}
+.picker .picker-msg {
+  font-size: 16px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+  color: #ddd;
+}
+.picker .picker-sub {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 24px;
+}
+.picker code {
+  background: #2a2a2a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.loading, .error {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #888;
+  font-size: 15px;
+  line-height: 1.6;
+  width: 90%;
+  max-width: 480px;
+}
+.error { color: #f55; }
+.error code {
+  background: #222;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="game-title">이상형 월드컵</h1>
+  <div class="round-label" id="round-label">로딩</div>
+</header>
+<div id="app"><div class="loading">로딩 중...</div></div>
+
+<script>
+const TOTAL = 16;
+const ROUND_LABELS = { 16: '16강', 8: '8강', 4: '4강', 2: '결승' };
+
+let tournamentTitle = '이상형 월드컵';
+let titles = {};
+let contestants = [];
+let currentRoundSize = TOTAL;
+let currentMatches = [];
+let currentMatchIndex = 0;
+let winners = [];
+let losersByRound = {};
+
+const $ = (s) => document.querySelector(s);
+const escapeHtml = (s) => {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+};
+
+function parseTitles(text) {
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(\d+)\.\s*(.+?)\s*$/);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (n === 0) tournamentTitle = m[2];
+    else titles[n] = m[2];
+  }
+}
+
+async function loadTitles() {
+  let text;
+  if (location.protocol === 'file:') {
+    text = await pickTitlesFile();
+  } else {
+    const res = await fetch('titles.txt');
+    if (!res.ok) throw new Error('titles.txt 로드 실패 (HTTP ' + res.status + ')');
+    text = await res.text();
+  }
+  parseTitles(text);
+  $('#game-title').textContent = tournamentTitle;
+  document.title = tournamentTitle;
+}
+
+function pickTitlesFile() {
+  return new Promise((resolve, reject) => {
+    $('#round-label').textContent = '시작';
+    $('#app').innerHTML = `
+      <div class="picker">
+        <h2>이상형 월드컵</h2>
+        <p class="picker-msg">로컬 실행에서는 <code>titles.txt</code>를 직접 선택해주세요</p>
+        <p class="picker-sub">GitHub Pages에 배포하면 자동으로 불러옵니다</p>
+        <button id="pick-btn" class="restart">titles.txt 선택</button>
+      </div>
+    `;
+    $('#pick-btn').addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.txt,text/plain';
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('파일 읽기 실패'));
+        reader.readAsText(file, 'utf-8');
+      });
+      input.click();
+    });
+  });
+}
+
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const imgBase = (n, title) => `images/${n}. ${title}`;
+
+function imgHTML(c) {
+  return `<img src="${escapeHtml(c.imgBase + '.jpg')}" alt="" data-png="${escapeHtml(c.imgBase + '.png')}" onerror="if(this.dataset.tried){this.style.visibility='hidden'}else{this.dataset.tried='1';this.src=this.dataset.png}">`;
+}
+
+function startGame() {
+  document.body.style.overflow = 'hidden';
+  contestants = [];
+  for (let i = 1; i <= TOTAL; i++) {
+    const title = titles[i] || `후보 ${i}`;
+    contestants.push({ id: i, title, imgBase: imgBase(i, title) });
+  }
+  currentRoundSize = TOTAL;
+  losersByRound = { 16: [], 8: [], 4: [], 2: [] };
+  startRound();
+}
+
+function startRound() {
+  const shuffled = shuffle(contestants);
+  currentMatches = [];
+  for (let i = 0; i < shuffled.length; i += 2) {
+    currentMatches.push([shuffled[i], shuffled[i + 1]]);
+  }
+  currentMatchIndex = 0;
+  winners = [];
+  showMatch();
+}
+
+function updateRoundLabel() {
+  const name = ROUND_LABELS[currentRoundSize] || '';
+  const total = currentMatches.length;
+  $('#round-label').textContent = `${name} (${currentMatchIndex + 1}/${total})`;
+}
+
+function showMatch() {
+  updateRoundLabel();
+  const [a, b] = currentMatches[currentMatchIndex];
+  $('#app').innerHTML = `
+    <div class="match" id="match">
+      <div class="choice" data-side="a">
+        ${imgHTML(a)}
+        <div class="title">${escapeHtml(a.title)}</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="choice" data-side="b">
+        ${imgHTML(b)}
+        <div class="title">${escapeHtml(b.title)}</div>
+      </div>
+    </div>
+  `;
+  const matchEl = $('#match');
+  document.querySelectorAll('.choice').forEach((el) => {
+    el.addEventListener('click', () => {
+      if (matchEl.classList.contains('selecting')) return;
+      const side = el.dataset.side;
+      const winner = side === 'a' ? a : b;
+      const loser = side === 'a' ? b : a;
+      document.querySelectorAll('.choice').forEach((c) => {
+        c.classList.add(c === el ? 'selected' : 'unselected');
+      });
+      matchEl.classList.add('selecting');
+      losersByRound[currentRoundSize].push(loser);
+      winners.push(winner);
+      setTimeout(() => {
+        currentMatchIndex++;
+        if (currentMatchIndex < currentMatches.length) {
+          showMatch();
+        } else {
+          contestants = winners;
+          currentRoundSize /= 2;
+          if (currentRoundSize >= 2) startRound();
+          else showResults(winners[0]);
+        }
+      }, 750);
+    });
+  });
+}
+
+function showResults(champion) {
+  $('#round-label').textContent = '결과';
+  document.body.style.overflow = 'auto';
+  const ranking = [
+    { label: '1위', c: champion, cls: 'top' },
+    { label: '2위', c: losersByRound[2][0], cls: 'runner-up' },
+  ];
+  for (const c of losersByRound[4]) ranking.push({ label: '공동 3위', c });
+  for (const c of losersByRound[8]) ranking.push({ label: '공동 5위', c });
+  for (const c of losersByRound[16]) ranking.push({ label: '공동 9위', c });
+
+  $('#app').innerHTML = `
+    <div class="results">
+      <h2>최종 순위</h2>
+      <div class="winner-name">우승: ${escapeHtml(champion.title)}</div>
+      ${ranking.map(r => `
+        <div class="rank-row${r.cls ? ' ' + r.cls : ''}">
+          <div class="rank">${r.label}</div>
+          ${imgHTML(r.c)}
+          <div class="name">${escapeHtml(r.c.title)}</div>
+        </div>
+      `).join('')}
+      <button class="restart" onclick="location.reload()">다시 하기</button>
+    </div>
+  `;
+}
+
+(async () => {
+  try {
+    await loadTitles();
+    startGame();
+  } catch (e) {
+    $('#app').innerHTML = `<div class="error">${escapeHtml(e.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
