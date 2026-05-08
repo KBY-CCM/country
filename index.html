@@ -77,11 +77,12 @@ header h1 {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: clamp(22px, 2.8vw, 40px);
+  font-size: clamp(20px, 2.5vw, 36px);
   font-weight: 900;
   color: #fff;
   text-align: center;
   width: 92%;
+  max-width: calc(50vw - 100px);
   pointer-events: none;
   text-shadow:
     -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
@@ -186,6 +187,36 @@ header h1 {
   transition: background 0.15s;
 }
 .restart:hover { background: #ffe07a; }
+
+.round-transition {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.round-transition.show { opacity: 1; }
+.round-transition-text {
+  font-size: clamp(28px, 4.5vw, 56px);
+  font-weight: 900;
+  color: #ffd54a;
+  text-shadow:
+    -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+    0 -2px 0 #000, 0 2px 0 #000, -2px 0 0 #000, 2px 0 0 #000;
+  letter-spacing: -0.5px;
+  transform: translateY(15px) scale(0.92);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.round-transition.show .round-transition-text {
+  transform: translateY(0) scale(1);
+}
 
 .picker {
   position: fixed;
@@ -367,6 +398,21 @@ function updateRoundLabel() {
   $('#round-label').textContent = `${name} (${currentMatchIndex + 1}/${total})`;
 }
 
+function showRoundTransition(fromSize, toSize, callback) {
+  const overlay = document.createElement('div');
+  overlay.className = 'round-transition';
+  overlay.innerHTML = `<div class="round-transition-text">${ROUND_LABELS[fromSize]} 끝, ${ROUND_LABELS[toSize]} 시작</div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('show'));
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    setTimeout(() => {
+      overlay.remove();
+      callback();
+    }, 250);
+  }, 800);
+}
+
 function showMatch() {
   updateRoundLabel();
   const [a, b] = currentMatches[currentMatchIndex];
@@ -401,10 +447,14 @@ function showMatch() {
         if (currentMatchIndex < currentMatches.length) {
           showMatch();
         } else {
+          const fromSize = currentRoundSize;
           contestants = winners;
           currentRoundSize /= 2;
-          if (currentRoundSize >= 2) startRound();
-          else showResults(winners[0]);
+          if (currentRoundSize >= 2) {
+            showRoundTransition(fromSize, currentRoundSize, () => startRound());
+          } else {
+            showResults(winners[0]);
+          }
         }
       }, 750);
     });
