@@ -286,7 +286,8 @@ header h1 {
 <script>
 const roundLabel = (size) => size === 2 ? '결승' : `${size}강`;
 
-let tournamentTitle = '이상형 월드컵';
+let tournamentTitle = null;
+let urlSlug = '';
 let titles = {};
 let contestants = [];
 let currentRoundSize = 0;
@@ -305,11 +306,22 @@ const escapeHtml = (s) => {
 
 function parseTitles(text) {
   for (const line of text.split(/\r?\n/)) {
-    const m = line.match(/^\s*(\d+)\.\s*(.+?)\s*$/);
-    if (!m) continue;
-    const n = parseInt(m[1], 10);
-    if (n === 0) tournamentTitle = m[2];
-    else titles[n] = m[2];
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const numMatch = trimmed.match(/^(\d+)\.\s*(.+?)\s*$/);
+    if (numMatch) {
+      const n = parseInt(numMatch[1], 10);
+      if (n === 0) tournamentTitle = numMatch[2];
+      else titles[n] = numMatch[2];
+      continue;
+    }
+
+    const urlMatch = trimmed.match(/^url\.\s*(.+?)\s*$/i);
+    if (urlMatch) {
+      urlSlug = urlMatch[1];
+      continue;
+    }
   }
 }
 
@@ -323,8 +335,9 @@ async function loadTitles() {
     text = await res.text();
   }
   parseTitles(text);
-  $('#game-title').textContent = tournamentTitle;
-  document.title = tournamentTitle;
+  const displayTitle = tournamentTitle || '이상형 월드컵';
+  $('#game-title').textContent = displayTitle;
+  document.title = displayTitle;
 }
 
 function pickTitlesFile() {
