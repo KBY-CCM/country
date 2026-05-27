@@ -284,14 +284,14 @@ header h1 {
 <div id="app"><div class="loading">로딩 중...</div></div>
 
 <script>
-const TOTAL = 16;
-const ROUND_LABELS = { 16: '16강', 8: '8강', 4: '4강', 2: '결승' };
+const roundLabel = (size) => size === 2 ? '결승' : `${size}강`;
 
 let tournamentTitle = '이상형 월드컵';
 let titles = {};
 let contestants = [];
-let currentRoundSize = TOTAL;
+let currentRoundSize = 0;
 let currentMatches = [];
+let currentByes = [];
 let currentMatchIndex = 0;
 let winners = [];
 let losersByRound = {};
@@ -364,40 +364,58 @@ const shuffle = (arr) => {
   return a;
 };
 
-const imgBase = (n, title) => `images/${n}. ${title}`;
+function imgPaths(n, title) {
+  const exts = ['jpg', 'jpeg', 'png', 'webp'];
+  const bases = [`images/${n}.${title}`, `images/${n}. ${title}`];
+  const out = [];
+  for (const base of bases) for (const ext of exts) out.push(base + '.' + ext);
+  return out;
+}
 
 function imgHTML(c) {
-  const exts = ['jpg', 'jpeg', 'png', 'webp'];
-  const first = c.imgBase + '.' + exts[0];
-  const rest = exts.slice(1).map(e => c.imgBase + '.' + e).join('|');
+  const first = c.imgPaths[0];
+  const rest = c.imgPaths.slice(1).join('|');
   return `<img src="${escapeHtml(first)}" alt="" data-paths="${escapeHtml(rest)}" onerror="var p=this.dataset.paths;if(p){var a=p.split('|');this.src=a[0];this.dataset.paths=a.slice(1).join('|')}else{this.style.visibility='hidden'}">`;
 }
 
 function startGame() {
   document.body.style.overflow = 'hidden';
-  contestants = [];
-  for (let i = 1; i <= TOTAL; i++) {
-    const title = titles[i] || `후보 ${i}`;
-    contestants.push({ id: i, title, imgBase: imgBase(i, title) });
-  }
-  currentRoundSize = TOTAL;
-  losersByRound = { 16: [], 8: [], 4: [], 2: [] };
+  const ids = Object.keys(titles).map(Number).sort((a, b) => a - b);
+  if (ids.length < 2) throw new Error('titles.txt에 최소 2개 이상의 항목이 필요합니다 (현재 ' + ids.length + '개)');
+  contestants = ids.map((id) => ({ id, title: titles[id], imgPaths: imgPaths(id, titles[id]) }));
+  losersByRound = {};
   startRound();
 }
 
 function startRound() {
+  const N = contestants.length;
+  currentRoundSize = N;
+  if (!losersByRound[N]) losersByRound[N] = [];
+
   const shuffled = shuffle(contestants);
   currentMatches = [];
-  for (let i = 0; i < shuffled.length; i += 2) {
-    currentMatches.push([shuffled[i], shuffled[i + 1]]);
+  currentByes = [];
+
+  // largest power of 2 ≤ N
+  let P = 1;
+  while (P * 2 <= N) P *= 2;
+
+  if (P === N) {
+    for (let i = 0; i < N; i += 2) currentMatches.push([shuffled[i], shuffled[i + 1]]);
+  } else {
+    // prelim: (N - P) matches use 2*(N-P) candidates, rest get byes
+    const prelimCount = N - P;
+    for (let i = 0; i < prelimCount; i++) currentMatches.push([shuffled[i * 2], shuffled[i * 2 + 1]]);
+    currentByes = shuffled.slice(2 * prelimCount);
   }
+
   currentMatchIndex = 0;
   winners = [];
   showMatch();
 }
 
 function updateRoundLabel() {
-  const name = ROUND_LABELS[currentRoundSize] || '';
+  const name = roundLabel(currentRoundSize);
   const total = currentMatches.length;
   $('#round-label').textContent = `${name} (${currentMatchIndex + 1}/${total})`;
 }
@@ -405,7 +423,7 @@ function updateRoundLabel() {
 function showRoundTransition(fromSize, toSize, callback) {
   const overlay = document.createElement('div');
   overlay.className = 'round-transition';
-  overlay.innerHTML = `<div class="round-transition-text">${ROUND_LABELS[fromSize]} 끝, ${ROUND_LABELS[toSize]} 시작</div>`;
+  overlay.innerHTML = `<div class="round-transition-text">${roundLabel(fromSize)} 끝, ${roundLabel(toSize)} 시작</div>`;
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add('show'));
   setTimeout(() => {
@@ -452,12 +470,12 @@ function showMatch() {
           showMatch();
         } else {
           const fromSize = currentRoundSize;
-          contestants = winners;
-          currentRoundSize /= 2;
-          if (currentRoundSize >= 2) {
-            showRoundTransition(fromSize, currentRoundSize, () => startRound());
+          contestants = [...winners, ...currentByes];
+          const toSize = contestants.length;
+          if (toSize >= 2) {
+            showRoundTransition(fromSize, toSize, () => startRound());
           } else {
-            showResults(winners[0]);
+            showResults(contestants[0]);
           }
         }
       }, 750);
@@ -468,13 +486,18 @@ function showMatch() {
 function showResults(champion) {
   $('#round-label').textContent = '결과';
   document.body.style.overflow = 'auto';
-  const ranking = [
-    { label: '1위', c: champion, cls: 'top' },
-    { label: '2위', c: losersByRound[2][0], cls: 'runner-up' },
-  ];
-  for (const c of losersByRound[4]) ranking.push({ label: '공동 3위', c });
-  for (const c of losersByRound[8]) ranking.push({ label: '공동 5위', c });
-  for (const c of losersByRound[16]) ranking.push({ label: '공동 9위', c });
+
+  const ranking = [{ label: '1위', c: champion, cls: 'top' }];
+  // smallest round first (결승 → 4강 → 8강 → ...)
+  const roundSizes = Object.keys(losersByRound).map(Number).sort((a, b) => a - b);
+  for (const size of roundSizes) {
+    const losers = losersByRound[size];
+    if (losers.length === 0) continue;
+    const rank = size - losers.length + 1;
+    const label = losers.length === 1 ? `${rank}위` : `공동 ${rank}위`;
+    const cls = rank === 2 ? 'runner-up' : '';
+    for (const c of losers) ranking.push({ label, c, cls });
+  }
 
   $('#app').innerHTML = `
     <div class="results">
