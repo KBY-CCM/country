@@ -378,17 +378,41 @@ const shuffle = (arr) => {
 };
 
 function imgPaths(n, title) {
-  const exts = ['jpg', 'jpeg', 'png', 'webp'];
-  const bases = [`images/${n}.${title}`, `images/${n}. ${title}`];
-  const out = [];
-  for (const base of bases) for (const ext of exts) out.push(base + '.' + ext);
-  return out;
+  const exts = ['jpg', 'png', 'jpeg', 'webp'];
+  return exts.map((ext) => `images/${n}.${title}.${ext}`);
+}
+
+function preloadImage(c) {
+  if (c.preloadStarted) return;
+  c.preloadStarted = true;
+  let i = 0;
+  const tryNext = () => {
+    if (i >= c.imgPaths.length) return;
+    const img = new Image();
+    img.onload = () => { c.resolvedPath = c.imgPaths[i]; };
+    img.onerror = () => { i++; tryNext(); };
+    img.src = c.imgPaths[i];
+  };
+  tryNext();
+}
+
+function preloadAround(matchIdx, lookahead) {
+  for (let i = 0; i <= lookahead; i++) {
+    const idx = matchIdx + i;
+    if (idx >= currentMatches.length) break;
+    const [a, b] = currentMatches[idx];
+    preloadImage(a);
+    preloadImage(b);
+  }
 }
 
 function imgHTML(c) {
+  if (c.resolvedPath) {
+    return `<img src="${escapeHtml(c.resolvedPath)}" alt="" decoding="async">`;
+  }
   const first = c.imgPaths[0];
   const rest = c.imgPaths.slice(1).join('|');
-  return `<img src="${escapeHtml(first)}" alt="" data-paths="${escapeHtml(rest)}" onerror="var p=this.dataset.paths;if(p){var a=p.split('|');this.src=a[0];this.dataset.paths=a.slice(1).join('|')}else{this.style.visibility='hidden'}">`;
+  return `<img src="${escapeHtml(first)}" alt="" decoding="async" data-paths="${escapeHtml(rest)}" onerror="var p=this.dataset.paths;if(p){var a=p.split('|');this.src=a[0];this.dataset.paths=a.slice(1).join('|')}else{this.style.visibility='hidden'}">`;
 }
 
 function startGame() {
@@ -450,6 +474,7 @@ function showRoundTransition(fromSize, toSize, callback) {
 
 function showMatch() {
   updateRoundLabel();
+  preloadAround(currentMatchIndex, 3);
   const [a, b] = currentMatches[currentMatchIndex];
   $('#app').innerHTML = `
     <div class="match" id="match">
