@@ -289,6 +289,7 @@ const roundLabel = (size) => size === 2 ? '결승' : `${size}강`;
 let tournamentTitle = null;
 let urlSlug = '';
 let titles = {};
+let imageManifest = {};
 let contestants = [];
 let currentRoundSize = 0;
 let currentMatches = [];
@@ -377,9 +378,34 @@ const shuffle = (arr) => {
   return a;
 };
 
-function imgPaths(n, title) {
+function imgPaths(n) {
+  if (imageManifest[n]) {
+    return [`images/${imageManifest[n]}`];
+  }
+  // Fallback when manifest isn't available: try common extensions with number-only name
   const exts = ['jpg', 'png', 'jpeg', 'webp'];
-  return exts.map((ext) => `images/${n}.${title}.${ext}`);
+  return exts.map((ext) => `images/${n}.${ext}`);
+}
+
+async function loadImageManifest() {
+  try {
+    const ownerMatch = location.host.match(/^([^.]+)\.github\.io$/i);
+    const repoMatch = location.pathname.match(/^\/([^/]+)/);
+    if (!ownerMatch || !repoMatch) return;
+    const url = `https://api.github.com/repos/${ownerMatch[1]}/${repoMatch[1]}/contents/images`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const files = await res.json();
+    for (const f of files) {
+      const m = f.name.match(/^(\d+)\./);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!imageManifest[n]) imageManifest[n] = f.name;
+      }
+    }
+  } catch (e) {
+    // fall through to fallback paths in imgPaths()
+  }
 }
 
 function preloadImage(c) {
@@ -419,7 +445,7 @@ function startGame() {
   document.body.style.overflow = 'hidden';
   const ids = Object.keys(titles).map(Number).sort((a, b) => a - b);
   if (ids.length < 2) throw new Error('titles.txt에 최소 2개 이상의 항목이 필요합니다 (현재 ' + ids.length + '개)');
-  contestants = ids.map((id) => ({ id, title: titles[id], imgPaths: imgPaths(id, titles[id]) }));
+  contestants = ids.map((id) => ({ id, title: titles[id], imgPaths: imgPaths(id) }));
   losersByRound = {};
   startRound();
 }
@@ -555,7 +581,7 @@ function showResults(champion) {
 
 (async () => {
   try {
-    await loadTitles();
+    await Promise.all([loadTitles(), loadImageManifest()]);
     startGame();
   } catch (e) {
     $('#app').innerHTML = `<div class="error">${escapeHtml(e.message)}</div>`;
